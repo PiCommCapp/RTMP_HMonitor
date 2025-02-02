@@ -1,0 +1,57 @@
+networks:
+  rtmp_mon:
+    driver: bridge
+
+volumes:
+  rtmp01_db:
+
+
+services:
+  rtmpmonitor01:
+    image: python:bullseye
+    container_name: rtmpmonitor
+    restart: unless-stopped
+    user: ${puid:-1000}
+    networks:
+      - rtmp_mon
+    # ports:
+    #   - ?
+    volumes:
+      - ./app:/usr/local/bin/rtmpmonitor
+      - ./config:/usr/local/bin/rtmpmonitor/config
+    environment:
+      - PUID={puid:-1000}
+      - PGID={pgid:-1000}
+      - TZ={tz:- 'Europe/Dublin'}
+
+  influxdb01:
+    image: influxdb:2.7-alpine
+    container_name: influxdb01
+    user: ${puid:-1000}
+    ports:
+      - ${influxdb_port:-8086}:8086
+    networks:
+      - rtmp_mon
+    volumes:
+      - rtmp01_db:/var/lib/postgresql/data
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${influxdb_username:-rtmpmonitor}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${influxdb_password:-rtmpmonitor}
+      - DOCKER_INFLUXDB_INIT_ORG=${influxdb_org:-rtmpmonitor}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${influxdb_bucket:-rtmpmonitor}
+      - DOCKER_INFLUXDB_INIT_RETENTION=${influxdb_retention:-1w}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-auth-token
+    restart: unless-stopped
+
+  grafana01:
+    image: grafana/grafana-enterprise
+    container_name: grafana
+    restart: unless-stopped
+    user: ${puid:-1000}
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./data/grafana:/var/lib/grafana'
+    networks:
+      - rtmp_mon
